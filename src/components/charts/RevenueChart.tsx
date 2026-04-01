@@ -15,10 +15,12 @@ import { Card } from '../ui/Card';
 
 interface RevenueChartProps {
   data: RevenueData[];
+  windowSize: 1 | 3 | 6 | 9 | 12;
+  onWindowChange: (value: 1 | 3 | 6 | 9 | 12) => void;
 }
 
 /** Gradient area chart showing monthly revenue vs profit */
-export function RevenueChart({ data }: RevenueChartProps) {
+export function RevenueChart({ data, windowSize, onWindowChange }: RevenueChartProps) {
   return (
     <Card className="col-span-full lg:col-span-2">
       <div className="flex items-center justify-between mb-6">
@@ -36,12 +38,16 @@ export function RevenueChart({ data }: RevenueChartProps) {
           </label>
           <select
             id="revenue-period-select"
+            value={windowSize}
+            onChange={(e) => onWindowChange(Number(e.target.value) as 1 | 3 | 6 | 9 | 12)}
             className="px-3 py-1.5 rounded-lg text-sm bg-gray-100 dark:bg-gray-800 border-0 text-gray-600 dark:text-gray-300 outline-none cursor-pointer"
             aria-label="Revenue period"
           >
-            <option>Last 12 months</option>
-            <option>Last 6 months</option>
-            <option>Last 3 months</option>
+            <option value={1}>Last 1 month</option>
+            <option value={3}>Last 3 months</option>
+            <option value={6}>Last 6 months</option>
+            <option value={9}>Last 9 months</option>
+            <option value={12}>Last 12 months</option>
           </select>
         </div>
       </div>

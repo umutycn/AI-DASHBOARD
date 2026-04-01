@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useFetch } from '../hooks';
 import { useToast } from '../store/toastContext';
 import { formatCurrency, formatNumber } from '../utils';
@@ -24,6 +24,7 @@ import { Badge, Card, Skeleton } from '../components/ui';
 
 export default function Dashboard() {
   const { addToast } = useToast();
+  const [windowSize, setWindowSize] = useState<1 | 3 | 6 | 9 | 12>(12);
 
   // Wrap fetchers in useCallback so useFetch doesn't re-trigger on every render
   const fetchStatsCb = useCallback(() => fetchStats(), []);
@@ -65,28 +66,29 @@ export default function Dashboard() {
     if (activityError) addToast(`Failed to load activity data: ${activityError}`, 'error');
   }, [activityError, addToast]);
 
-  const totalRequests = performance?.reduce((sum, item) => sum + item.requests, 0) ?? 0;
-  const totalErrors = performance?.reduce((sum, item) => sum + item.errors, 0) ?? 0;
+  const visibleRevenue = revenue ? revenue.slice(-windowSize) : [];
+  const visiblePerformance = performance ? performance.slice(-windowSize) : [];
+  const visibleModels = models ? models.slice(0, windowSize) : [];
+  const visibleActivity = activity ? activity.slice(0, windowSize) : [];
+
+  const totalRequests = visiblePerformance.reduce((sum, item) => sum + item.requests, 0);
+  const totalErrors = visiblePerformance.reduce((sum, item) => sum + item.errors, 0);
   const errorRate = totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0;
   const avgLatency =
-    performance && performance.length > 0
-      ? performance.reduce((sum, item) => sum + item.latency, 0) / performance.length
+    visiblePerformance.length > 0
+      ? visiblePerformance.reduce((sum, item) => sum + item.latency, 0) / visiblePerformance.length
       : 0;
 
-  const revenueSplit = revenue ? Math.max(1, Math.floor(revenue.length / 2)) : 1;
-  const previousRevenue = revenue
-    ? revenue.slice(0, revenueSplit).reduce((sum, item) => sum + item.revenue, 0)
-    : 0;
-  const currentRevenue = revenue
-    ? revenue.slice(revenueSplit).reduce((sum, item) => sum + item.revenue, 0)
-    : 0;
+  const revenueSplit = Math.max(1, Math.floor(visibleRevenue.length / 2));
+  const previousRevenue = visibleRevenue.slice(0, revenueSplit).reduce((sum, item) => sum + item.revenue, 0);
+  const currentRevenue = visibleRevenue.slice(revenueSplit).reduce((sum, item) => sum + item.revenue, 0);
   const revenueDelta = previousRevenue > 0 ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : 0;
 
   const topTraffic =
     traffic && traffic.length > 0 ? [...traffic].sort((a, b) => b.value - a.value)[0] : null;
 
   const highestCostModel =
-    models && models.length > 0 ? [...models].sort((a, b) => b.cost - a.cost)[0] : null;
+    visibleModels.length > 0 ? [...visibleModels].sort((a, b) => b.cost - a.cost)[0] : null;
 
   const recommendations: Array<{
     id: string;
@@ -141,7 +143,19 @@ export default function Dashboard() {
 
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800/60 text-xs font-medium text-gray-600 dark:text-gray-300">
           <span>Window:</span>
-          <Badge variant="info">Last 12 points</Badge>
+          {[1, 3, 6, 9, 12].map((size) => (
+            <button
+              key={size}
+              onClick={() => setWindowSize(size as 1 | 3 | 6 | 9 | 12)}
+              className={`px-2 py-0.5 rounded-md ${
+                windowSize === size
+                  ? 'bg-brand-600 text-white'
+                  : 'bg-white dark:bg-surface-800 text-gray-600 dark:text-gray-300'
+              }`}
+            >
+              {`Last ${size} month${size > 1 ? 's' : ''}`}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -207,7 +221,13 @@ export default function Dashboard() {
           {revenueLoading ? (
             <Skeleton className="h-96 rounded-2xl col-span-full lg:col-span-2" />
           ) : (
-            revenue && <RevenueChart data={revenue} />
+            visibleRevenue.length > 0 && (
+              <RevenueChart
+                data={visibleRevenue}
+                windowSize={windowSize}
+                onWindowChange={setWindowSize}
+              />
+            )
           )}
 
           {trafficLoading ? (
@@ -223,13 +243,13 @@ export default function Dashboard() {
         {perfLoading ? (
           <Skeleton className="h-96 rounded-2xl col-span-full lg:col-span-2" />
         ) : (
-          performance && <PerformanceChart data={performance} />
+          visiblePerformance.length > 0 && <PerformanceChart data={visiblePerformance} />
         )}
 
         {activityLoading ? (
           <Skeleton className="h-96 rounded-2xl" />
         ) : (
-          activity && <ActivityFeed activities={activity} />
+          visibleActivity.length > 0 && <ActivityFeed activities={visibleActivity} />
         )}
       </div>
 
@@ -271,7 +291,7 @@ export default function Dashboard() {
         {modelsLoading ? (
           <Skeleton className="h-64 rounded-2xl" />
         ) : (
-          models && <ModelTable models={models} />
+          visibleModels.length > 0 && <ModelTable models={visibleModels} />
         )}
       </div>
     </div>
